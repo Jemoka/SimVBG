@@ -81,23 +81,27 @@ traits = TraitVector([
 
 ## Packaged Prompts
 
-The package uses the legacy prompt text from `simvbg/prompts/` via `importlib.resources`, and `pyproject.toml` includes those files in the wheel. The WVS JSON metadata is also copied into `simvbg/data/` at build time.
+The package uses the legacy prompt text from `simvbg/prompts/` via `importlib.resources`. JSON resources live outside the module under `resources/` in the source tree, and `pyproject.toml` copies them into package resource paths at wheel build time:
+
+- `resources/wvs/` -> `simvbg/data/`
+- `resources/data_split/` -> `simvbg/data_split/`
 
 For a mapping from original scripts/functions to public package APIs, see `legacy/MAPPING.md`.
 
 ## WVS Helpers
 
-The package includes helpers for converting World Values Survey rows into trait vectors:
+The original experiments get profile traits from WVS question IDs. A split's `train_set` is used as profile/trait questions, and its `test_set` is used as questions to answer. The package includes helpers for loading those splits and converting WVS rows into trait vectors:
 
 ```python
-from simvbg import Actor, load_rows, trait_vector_from_wvs_row
+from simvbg import Actor, load_packaged_split, load_rows, trait_vector_from_wvs_row
 
+split = load_packaged_split("fromCV_SPLIT_FOLD_5.json")
 rows = load_rows("WVS_dataset/WVS_Cross-National_Wave_7_csv_v6_0.csv")
-traits = trait_vector_from_wvs_row(rows[0], ["Q1", "Q2", "Q3"])
+traits = trait_vector_from_wvs_row(rows[0], split.profile_questions)
 actor = Actor(traits)
 ```
 
-`questions.json` and `nature_options.json` are included in built wheels. The large raw WVS CSV is not bundled; pass its path explicitly when you need it.
+`questions.json`, `nature_options.json`, and the checked-in split JSON files are included in built wheels. The large raw WVS CSV is not bundled; pass its path explicitly when you need it.
 
 ## Models
 

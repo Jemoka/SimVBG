@@ -4,7 +4,7 @@ import math
 import unittest
 from pathlib import Path
 
-from simvbg import Actor, Scenario
+from simvbg import Actor, Scenario, create_cross_validation_splits, load_packaged_split
 from simvbg.actor import parse_answer_and_analysis
 from simvbg.wvs import trait_vector_from_wvs_row
 
@@ -156,6 +156,19 @@ Analysis: [your reasoning for this decision]
         )
 
         self.assertEqual(traits.render(), "Chosen option\nAge is 45\nRaw: 8")
+
+    def test_packaged_split_matches_original_split_file(self):
+        split = load_packaged_split("fromCV_SPLIT_FOLD_5.json")
+
+        self.assertEqual(split.raw["fold"], 5)
+        self.assertEqual(split.profile_questions, split.raw["train_set"])
+        self.assertEqual(split.scenario_questions, split.raw["test_set"])
+
+    def test_cross_validation_split_reproduces_original_shape(self):
+        splits = create_cross_validation_splits(num_folds=5, random_seed=42)
+
+        self.assertEqual([split.fold for split in splits], [1, 2, 3, 4, 5])
+        self.assertEqual(len(splits[0].train_set) + len(splits[0].test_set), 290)
 
 
 if __name__ == "__main__":

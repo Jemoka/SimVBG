@@ -97,6 +97,12 @@ def _load_json(path: str | Path | None, filename: str) -> dict[str, Any]:
         with package_data.open(encoding="utf-8") as file:
             return json.load(file)
 
-    repo_data = Path(__file__).resolve().parent.parent / "WVS_dataset" / filename
-    with repo_data.open(encoding="utf-8") as file:
-        return json.load(file)
+    root = Path(__file__).resolve().parent.parent
+    for repo_data in [
+        root / "resources" / "wvs" / filename,
+        root / "WVS_dataset" / filename,
+    ]:
+        if repo_data.is_file():
+            with repo_data.open(encoding="utf-8") as file:
+                return json.load(file)
+    raise FileNotFoundError(f"Could not find WVS resource: {filename}")

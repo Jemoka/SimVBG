@@ -13,6 +13,8 @@ cmp legacy/code/Q_prompts/storymodule.txt simvbg/prompts/storymodule.txt
 cmp legacy/code/Q_prompts/prompt_cognitive.txt simvbg/prompts/prompt_cognitive.txt
 cmp legacy/code/Q_prompts/prompt_affective.txt simvbg/prompts/prompt_affective.txt
 cmp legacy/code/Q_prompts/prompt_behavioral.txt simvbg/prompts/prompt_behavioral.txt
+cmp WVS_dataset/questions.json resources/wvs/questions.json
+cmp WVS_dataset/nature_options.json resources/wvs/nature_options.json
 ```
 
 `simvbg/prompts/coordinator.txt` and `simvbg/prompts/prompt_single.txt` come from string literals in `legacy/code/main_cv.py`, so they are checked by tests rather than by `cmp`.
@@ -54,6 +56,7 @@ wheel = next(Path("dist").glob("simvbg-*.whl"))
 required = [
     "simvbg/data/nature_options.json",
     "simvbg/data/questions.json",
+    "simvbg/data_split/fromCV_SPLIT_FOLD_5.json",
     "simvbg/prompts/coordinator.txt",
     "simvbg/prompts/prompt_affective.txt",
     "simvbg/prompts/prompt_behavioral.txt",

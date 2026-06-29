@@ -12,6 +12,7 @@ The `simvbg` package is a friendly API over the original prompt behavior from ht
 | `simvbg.Trait`, `simvbg.TraitVector` | `profile_texts` lists assembled in `main_cv.py` | Structured wrapper around the original newline-joined profile text. |
 | `simvbg.Scenario` | `generate_question_text_with_options` output shape | Caller-provided question/scenario text plus optional `Options:` block. |
 | `simvbg.trait_vector_from_wvs_row` | `generate_profile_text_list` | Converts WVS rows into the same natural-language profile lines used by the legacy scripts. |
+| `simvbg.load_packaged_split`, `simvbg.create_cross_validation_splits` | `load_split_from_json`, `create_cross_validation_splits` | Loads or reproduces the original profile/test WVS question splits. |
 | `simvbg.LiteLLMBackend` | `call_llm_api` / `init_client` | Replaces hardcoded OpenAI-compatible clients with LiteLLM while preserving the same chat-message shape. |
 
 ## Packaged Resources
@@ -27,7 +28,13 @@ The original prompt files are copied into package resources:
 | `simvbg/prompts/coordinator.txt` | String literal in `legacy/code/main_cv.py::coordinator_decision` |
 | `simvbg/prompts/prompt_single.txt` | String literal in `legacy/code/main_cv.py::process_original_profile_question` |
 
-The wheel also includes `questions.json` and `nature_options.json` as `simvbg/data/`.
+Package JSON resources are kept outside the module under `resources/` in source:
+
+| Source resource | Wheel resource |
+| --- | --- |
+| `resources/wvs/questions.json` | `simvbg/data/questions.json` |
+| `resources/wvs/nature_options.json` | `simvbg/data/nature_options.json` |
+| `resources/data_split/**.json` | `simvbg/data_split/**.json` |
 
 ## Still Legacy-Only
 

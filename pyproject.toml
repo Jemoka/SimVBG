@@ -30,16 +30,17 @@ artifacts = [
 ]
 
 [tool.hatch.build.targets.wheel.force-include]
-"WVS_dataset/questions.json" = "simvbg/data/questions.json"
-"WVS_dataset/nature_options.json" = "simvbg/data/nature_options.json"
+"resources/wvs/questions.json" = "simvbg/data/questions.json"
+"resources/wvs/nature_options.json" = "simvbg/data/nature_options.json"
+"resources/data_split" = "simvbg/data_split"
 
 [tool.hatch.build.targets.sdist]
 include = [
     "simvbg",
-    "WVS_dataset/questions.json",
-    "WVS_dataset/nature_options.json",
+    "resources",
     "legacy",
     "data_split",
+    "WVS_dataset",
     "stories",
     "README.md",
 ]
