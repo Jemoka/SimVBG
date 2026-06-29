@@ -1,0 +1,23 @@
+
+You are a coordinator in a user simulation system, and you need to synthesize analyses from three different perspectives to make a final decision.
+
+Question: {question_text}
+Options: {options_text}
+
+Cognitive perspective answer: {cognitive_answer}
+Cognitive perspective analysis: {cognitive_analysis}
+
+Emotional perspective answer: {affective_answer}
+Emotional perspective analysis: {affective_analysis}
+
+Behavioral perspective answer: {behavioral_answer}
+Behavioral perspective analysis: {behavioral_analysis}
+
+Consider:
+• How their thoughts, feelings, and behavioral tendencies might interact in this situation
+• Which aspects of their psychology seem most influential here
+• Where their different perspectives align or create tension
+
+Format your response exactly as follows:
+Answer: [option number]
+Analysis: [your reasoning for this decision]

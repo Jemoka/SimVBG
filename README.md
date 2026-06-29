@@ -1,53 +1,133 @@
 # SimVBG
 
-## Experiment Setup
+> This is a Codex-written packaging fork of the original SimVBG behavior from https://github.com/bangdedadi/SimVBG. The original scripts are preserved under `legacy/code/`; the `simvbg` package exposes their prompt and decision behavior through a friendlier importable API. See `CROSS_CHECKING.md` for how to verify package behavior against the preserved legacy code.
 
-### Main Experiment
-Run `main_cv.py` with the following parameters:
-setting = "multi_agent_voter"
-use_nature_options = True
-use_coordinator = True
-optimize_story = False
-load_stories = False
+SimVBG is a small Python package for trait-conditioned actor simulation. It turns a vector of traits, beliefs, survey answers, or biographical facts into an `Actor` that can answer caller-provided scenarios/questions through the original single-agent path or cognitive/affective/behavioral (CAB) path.
 
-### Baseline Experiments
+The legacy experiment scripts are preserved in `legacy/code/`, but the package API is centered on building new simulations from Python.
 
-#### Baseline 1 (Full Info)
-Run `main_cv.py` with:
-setting = "origin_full"
+## Installation
 
-#### Baseline 2 (RAG)
-Run `topk_cv.py` with:
-"topk": 3
-"threshold": 0.3
+```bash
+uv sync
+```
 
-### Ablation Experiments
+For editable use from another project:
 
-1. **Complete System**
-setting = "multi_agent_voter"
-use_nature_options = True
-use_coordinator = True
-optimize_story = False
-load_stories = False
+```bash
+uv add --editable /path/to/SimVBG
+```
 
-2. **Without Story Module**
-setting = "origintext_voter"
-use_nature_options = False
-use_coordinator = True
-optimize_story = False
-load_stories = True
+Set provider credentials using the environment variables LiteLLM expects. For OpenAI-compatible endpoints:
 
-3. **Without CAB Module**
-setting = "single_answer"
-use_nature_options = True
-use_coordinator = True
-optimize_story = False
-load_stories = True
+```bash
+export OPENAI_API_KEY="..."
+```
 
-### Profile Impact Experiment
-Run `profile_impact.py` and adjust `step_size` to change the number of profile information items added each time. Default `step_size = 58`.
+## Quick Start
 
-## Important Notes
+```python
+from simvbg import Actor, Scenario, Trait
 
-- Please adjust the language model path to your local model path. If using API services, replace `your_api_here` with your actual API key.
-- The code provides parallel computing capabilities. You can adjust `max_workers` according to your needs to control the number of parallel processes.
+actor = Actor(
+    traits=[
+        Trait("risk tolerance", "low", dimension="behavioral"),
+        Trait("political interest", "high", dimension="cognitive"),
+        Trait("family orientation", "strong", dimension="affective"),
+    ],
+    name="sample_actor",
+)
+
+scenario = Scenario(
+    "A local council proposes a tax increase to fund public transit.",
+    choices={
+        "1": "Strongly oppose",
+        "2": "Oppose",
+        "3": "Support",
+        "4": "Strongly support",
+    },
+)
+
+response = actor.turn(scenario, mode="cab")
+print(response.answer)
+print(response.analysis)
+print(response.perspectives["cognitive"]["analysis"])
+```
+
+## Trait Vectors
+
+You can pass traits as `Trait` objects, dictionaries, tuples, or a plain mapping:
+
+```python
+from simvbg import Actor
+
+actor = Actor({
+    "age": 45,
+    "religion": "not religious",
+    "trust in institutions": "low",
+})
+```
+
+For explicit metadata and dimensions:
+
+```python
+from simvbg import Trait, TraitVector
+
+traits = TraitVector([
+    Trait("prefers stability", True, dimension="behavioral", weight=0.8),
+    Trait("values personal freedom", "very high", dimension="affective"),
+])
+```
+
+## Packaged Prompts
+
+The package uses the legacy prompt text from `simvbg/prompts/` via `importlib.resources`, and `pyproject.toml` includes those files in the wheel. The WVS JSON metadata is also copied into `simvbg/data/` at build time.
+
+For a mapping from original scripts/functions to public package APIs, see `legacy/MAPPING.md`.
+
+## WVS Helpers
+
+The package includes helpers for converting World Values Survey rows into trait vectors:
+
+```python
+from simvbg import Actor, load_rows, trait_vector_from_wvs_row
+
+rows = load_rows("WVS_dataset/WVS_Cross-National_Wave_7_csv_v6_0.csv")
+traits = trait_vector_from_wvs_row(rows[0], ["Q1", "Q2", "Q3"])
+actor = Actor(traits)
+```
+
+`questions.json` and `nature_options.json` are included in built wheels. The large raw WVS CSV is not bundled; pass its path explicitly when you need it.
+
+## Models
+
+`Actor` uses `LiteLLMBackend` by default, so local and remote models share one API. Use LiteLLM model strings directly:
+
+```python
+from simvbg import Actor, LiteLLMBackend
+
+remote = LiteLLMBackend(model="openai/gpt-4o-mini")
+local = LiteLLMBackend(model="ollama/llama3.1")
+vllm = LiteLLMBackend(model="hosted_vllm/my-model", api_base="http://localhost:8000/v1")
+
+actor = Actor({"optimism": "high"}, backend=remote)
+```
+
+You can also inject any object with a `chat(messages, temperature=None) -> str` method. For tests:
+
+```python
+from simvbg import Actor, StaticBackend
+
+actor = Actor({"patience": "low"}, backend=StaticBackend("Answer: 2\nAnalysis: Test response."))
+assert actor.turn("Choose an option.").answer == 2
+```
+
+## Legacy Experiments
+
+The original cross-validation, TopK, ablation, and profile-impact scripts remain under `legacy/code/`. Install their extra dependencies with:
+
+```bash
+uv sync --extra experiments
+```
+
+Those scripts still expect local WVS data paths and model gateway settings. The package API is a wrapper around the original prompt behavior; it does not add scenario generation or new simulation logic that was not present in the original code.

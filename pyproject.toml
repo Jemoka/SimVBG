@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "simvbg"
+version = "0.1.0"
+description = "Trait-conditioned actor simulation with cognitive, affective, and behavioral turns."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "SimVBG contributors" }]
+dependencies = [
+    "litellm>=1.70.0",
+]
+
+[project.optional-dependencies]
+experiments = [
+    "httpx>=0.24",
+    "numpy>=1.24",
+    "tqdm>=4.66",
+    "matplotlib>=3.7",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["simvbg"]
+artifacts = [
+    "simvbg/prompts/*.txt",
+    "simvbg/py.typed",
+]
+
+[tool.hatch.build.targets.wheel.force-include]
+"WVS_dataset/questions.json" = "simvbg/data/questions.json"
+"WVS_dataset/nature_options.json" = "simvbg/data/nature_options.json"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "simvbg",
+    "WVS_dataset/questions.json",
+    "WVS_dataset/nature_options.json",
+    "legacy",
+    "data_split",
+    "stories",
+    "README.md",
+]
