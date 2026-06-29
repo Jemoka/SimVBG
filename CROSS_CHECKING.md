@@ -37,6 +37,8 @@ These tests compare the package API against preserved legacy behavior for:
 - numeric answer parsing
 - WVS row to profile text conversion
 
+Exact prompt parity checks call `Actor.turn(..., structured=False)`. The default `structured=True` mode appends a JSON-only response instruction and asks LiteLLM for `response_format={"type": "json_object"}` when the backend supports it, then falls back to legacy text parsing.
+
 ## 3. Build Resource Check
 
 Build the wheel:

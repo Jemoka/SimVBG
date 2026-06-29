@@ -54,6 +54,12 @@ print(response.analysis)
 print(response.perspectives["cognitive"]["analysis"])
 ```
 
+`Actor.turn()` requests JSON output by default so `response.answer` is parsed reliably across providers. For exact legacy prompt text, pass `structured=False`:
+
+```python
+response = actor.turn(scenario, mode="cab", structured=False)
+```
+
 ## Trait Vectors
 
 You can pass traits as `Trait` objects, dictionaries, tuples, or a plain mapping:

@@ -11,7 +11,13 @@ Message = Mapping[str, str]
 class ChatBackend(Protocol):
     """Minimal protocol Actor needs from a chat model backend."""
 
-    def chat(self, messages: Sequence[Message], *, temperature: float | None = None) -> str:
+    def chat(
+        self,
+        messages: Sequence[Message],
+        *,
+        temperature: float | None = None,
+        response_format: Mapping[str, Any] | None = None,
+    ) -> str:
         ...
 
 
@@ -32,7 +38,13 @@ class LiteLLMBackend:
     timeout: float | None = None
     extra_kwargs: dict[str, Any] = field(default_factory=dict)
 
-    def chat(self, messages: Sequence[Message], *, temperature: float | None = None) -> str:
+    def chat(
+        self,
+        messages: Sequence[Message],
+        *,
+        temperature: float | None = None,
+        response_format: Mapping[str, Any] | None = None,
+    ) -> str:
         try:
             from litellm import completion
         except ImportError as exc:
@@ -52,9 +64,17 @@ class LiteLLMBackend:
             kwargs["api_base"] = self.api_base
         if self.timeout is not None:
             kwargs["timeout"] = self.timeout
+        if response_format is not None:
+            kwargs["response_format"] = dict(response_format)
         kwargs.update(self.extra_kwargs)
 
-        response = completion(**kwargs)
+        try:
+            response = completion(**kwargs)
+        except Exception:
+            if response_format is None:
+                raise
+            kwargs.pop("response_format", None)
+            response = completion(**kwargs)
         return response.choices[0].message.content or ""
 
 @dataclass(slots=True)
@@ -63,5 +83,11 @@ class StaticBackend:
 
     response: str
 
-    def chat(self, messages: Sequence[Message], *, temperature: float | None = None) -> str:
+    def chat(
+        self,
+        messages: Sequence[Message],
+        *,
+        temperature: float | None = None,
+        response_format: Mapping[str, Any] | None = None,
+    ) -> str:
         return self.response

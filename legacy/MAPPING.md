@@ -48,3 +48,5 @@ These experiment runners are intentionally not converted into the public API:
 | `legacy/code/profile_impact.py` | Incremental profile information experiment. |
 
 They still contain local path assumptions and model-gateway placeholders from the original codebase.
+
+Note: package `Actor.turn()` defaults to `structured=True` for parse reliability. Use `structured=False` to send exact legacy prompt text.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import math
 from collections.abc import Iterable, Mapping, Sequence
@@ -54,24 +55,47 @@ class Actor:
         *,
         mode: TurnMode = "single",
         coordinate: bool = True,
+        structured: bool = True,
         temperature: float | None = None,
     ) -> ActorResponse:
-        """Respond to a scenario using legacy single-agent or CAB behavior."""
+        """Respond to a scenario using legacy single-agent or CAB behavior.
+
+        By default, `turn` asks the model for a JSON object so `response.answer`
+        is easier to parse. Set `structured=False` for exact legacy prompt text.
+        """
 
         scenario_obj = scenario if isinstance(scenario, Scenario) else Scenario(str(scenario))
         if mode == "single":
-            return self._single_turn(scenario_obj, temperature=temperature)
+            return self._single_turn(scenario_obj, structured=structured, temperature=temperature)
         if mode == "cab":
-            return self._cab_turn(scenario_obj, coordinate=coordinate, temperature=temperature)
+            return self._cab_turn(
+                scenario_obj,
+                coordinate=coordinate,
+                structured=structured,
+                temperature=temperature,
+            )
         raise ValueError(f"Unsupported turn mode: {mode}")
 
-    def _single_turn(self, scenario: Scenario, *, temperature: float | None) -> ActorResponse:
+    def _single_turn(
+        self,
+        scenario: Scenario,
+        *,
+        structured: bool,
+        temperature: float | None,
+    ) -> ActorResponse:
         prompt = _single_prompt(self.traits.render(), scenario)
-        content = self._chat(prompt, temperature=temperature)
-        answer, analysis = parse_answer_and_analysis(content)
+        content = self._chat(prompt, structured=structured, temperature=temperature)
+        answer, analysis = parse_model_answer(content)
         return ActorResponse(content=content, prompt=prompt, answer=answer, analysis=analysis)
 
-    def _cab_turn(self, scenario: Scenario, *, coordinate: bool, temperature: float | None) -> ActorResponse:
+    def _cab_turn(
+        self,
+        scenario: Scenario,
+        *,
+        coordinate: bool,
+        structured: bool,
+        temperature: float | None,
+    ) -> ActorResponse:
         rendered_scenario = scenario.render()
         profile = self.traits.render()
         perspective_results: dict[str, dict[str, Any]] = {}
@@ -81,8 +105,8 @@ class Actor:
                 profile_text=profile,
                 question_text_with_options=rendered_scenario,
             )
-            content = self._chat(prompt, temperature=temperature)
-            answer, analysis = parse_answer_and_analysis(content)
+            content = self._chat(prompt, structured=structured, temperature=temperature)
+            answer, analysis = parse_model_answer(content)
             perspective_results[perspective] = {
                 "answer": answer,
                 "analysis": analysis,
@@ -128,8 +152,13 @@ class Actor:
             behavioral_answer=perspective_results["behavioral"]["answer"],
             behavioral_analysis=perspective_results["behavioral"]["analysis"],
         )
-        content = self._chat(coordinator_prompt, temperature=temperature)
-        answer, analysis = parse_answer_and_analysis(content)
+        content = self._chat(coordinator_prompt, structured=structured, temperature=temperature)
+        answer, analysis = parse_model_answer(content)
+        if answer is None:
+            fallback_answer, method, decision_data = _average_decision(perspective_results)
+            if fallback_answer is not None:
+                answer = fallback_answer
+                analysis = analysis or f"Fallback {method}: {decision_data}"
         return ActorResponse(
             content=content,
             prompt=coordinator_prompt,
@@ -139,9 +168,46 @@ class Actor:
             perspectives=perspective_results,
         )
 
-    def _chat(self, prompt: str, *, temperature: float | None) -> str:
+    def _chat(self, prompt: str, *, structured: bool = False, temperature: float | None) -> str:
         assert self.backend is not None
-        return self.backend.chat([{"role": "user", "content": prompt}], temperature=temperature)
+        messages = [{"role": "user", "content": _structured_prompt(prompt) if structured else prompt}]
+        if not structured:
+            return self.backend.chat(messages, temperature=temperature)
+
+        try:
+            return self.backend.chat(
+                messages,
+                temperature=temperature,
+                response_format={"type": "json_object"},
+            )
+        except TypeError:
+            return self.backend.chat(messages, temperature=temperature)
+
+
+def parse_model_answer(text: str) -> tuple[int | None, str]:
+    answer, analysis = parse_json_answer_and_analysis(text)
+    if answer is not None or analysis:
+        return answer, analysis
+    return parse_answer_and_analysis(text)
+
+
+def parse_json_answer_and_analysis(text: str) -> tuple[int | None, str]:
+    data = _load_json_object(text)
+    if not isinstance(data, Mapping):
+        return None, ""
+
+    raw_answer = data.get("answer")
+    answer: int | None = None
+    if isinstance(raw_answer, int):
+        answer = raw_answer
+    elif isinstance(raw_answer, str):
+        match = re.search(r"\b\d+\b", raw_answer)
+        if match:
+            answer = int(match.group(0))
+
+    raw_analysis = data.get("analysis", "")
+    analysis = raw_analysis if isinstance(raw_analysis, str) else str(raw_analysis)
+    return answer, analysis.strip()
 
 
 def parse_answer_and_analysis(text: str) -> tuple[str | int | None, str]:
@@ -159,6 +225,28 @@ def parse_answer_and_analysis(text: str) -> tuple[str | int | None, str]:
         if len(parts) > 1:
             analysis = parts[1].strip()
     return answer, analysis
+
+
+def _load_json_object(text: str) -> Any:
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+    if not match:
+        return None
+    try:
+        return json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return None
+
+
+def _structured_prompt(prompt: str) -> str:
+    return f"""{prompt}
+
+Return JSON only with this schema:
+{{"answer": <selected option number as an integer or null>, "analysis": <string>}}"""
 
 
 def _single_prompt(profile: str, scenario: Scenario) -> str:

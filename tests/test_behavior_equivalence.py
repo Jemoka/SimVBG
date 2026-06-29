@@ -16,9 +16,11 @@ class CaptureBackend:
     def __init__(self, responses):
         self.responses = list(responses)
         self.messages = []
+        self.response_formats = []
 
-    def chat(self, messages, *, temperature=None):
+    def chat(self, messages, *, temperature=None, response_format=None):
         self.messages.append(list(messages))
+        self.response_formats.append(response_format)
         return self.responses.pop(0)
 
 
@@ -47,7 +49,7 @@ class BehaviorEquivalenceTests(unittest.TestCase):
         actor = Actor({"age": 45}, backend=backend)
         scenario = Scenario("Question text?", choices={"1": "Yes", "2": "No"})
 
-        actor.turn(scenario, mode="cab")
+        actor.turn(scenario, mode="cab", structured=False)
 
         rendered = scenario.render()
         for idx, name in enumerate(["cognitive", "affective", "behavioral"]):
@@ -62,7 +64,7 @@ class BehaviorEquivalenceTests(unittest.TestCase):
         actor = Actor({"age": 45}, backend=backend)
         scenario = Scenario("Question text?", choices={"1": "Yes", "2": "No"})
 
-        actor.turn(scenario, mode="single")
+        actor.turn(scenario, mode="single", structured=False)
 
         expected = (
             f"Question:{scenario.render()}\n"
@@ -85,7 +87,7 @@ class BehaviorEquivalenceTests(unittest.TestCase):
         actor = Actor({"age": 45}, backend=backend)
         scenario = Scenario("Question text?", choices={"1": "Yes", "2": "No", "3": "Maybe"})
 
-        actor.turn(scenario, mode="cab", coordinate=True)
+        actor.turn(scenario, mode="cab", coordinate=True, structured=False)
 
         expected = f"""
 You are a coordinator in a user simulation system, and you need to synthesize analyses from three different perspectives to make a final decision.
@@ -125,7 +127,7 @@ Analysis: [your reasoning for this decision]
         )
         actor = Actor({"age": 45}, backend=backend)
 
-        response = actor.turn("Question text?", mode="cab", coordinate=False)
+        response = actor.turn("Question text?", mode="cab", coordinate=False, structured=False)
 
         self.assertEqual(response.answer, math.ceil((1 + 2 + 3) / 3))
         self.assertIn("average_ceiling", response.content)
@@ -134,6 +136,50 @@ Analysis: [your reasoning for this decision]
         self.assertEqual(parse_answer_and_analysis("Answer: 7\nAnalysis: because"), (7, "because"))
         self.assertEqual(parse_answer_and_analysis("Answer: yes\nAnalysis: because"), (None, "because"))
         self.assertEqual(parse_answer_and_analysis("Answer: 2\nextra text"), (2, "extra text"))
+
+    def test_structured_single_turn_parses_json_answer(self):
+        backend = CaptureBackend(['{"answer": 2, "analysis": "json parsed"}'])
+        actor = Actor({"age": 45}, backend=backend)
+
+        response = actor.turn("Question text?", mode="single")
+
+        self.assertEqual(response.answer, 2)
+        self.assertEqual(response.analysis, "json parsed")
+        self.assertEqual(backend.response_formats[0], {"type": "json_object"})
+        self.assertIn("Return JSON only", backend.messages[0][0]["content"])
+
+    def test_structured_cab_turn_parses_json_answers(self):
+        backend = CaptureBackend(
+            [
+                '{"answer": 1, "analysis": "cognitive"}',
+                '{"answer": 2, "analysis": "affective"}',
+                '{"answer": 3, "analysis": "behavioral"}',
+                '{"answer": 2, "analysis": "coordinated"}',
+            ]
+        )
+        actor = Actor({"age": 45}, backend=backend)
+
+        response = actor.turn("Question text?", mode="cab")
+
+        self.assertEqual(response.answer, 2)
+        self.assertEqual(response.analysis, "coordinated")
+        self.assertEqual([fmt for fmt in backend.response_formats], [{"type": "json_object"}] * 4)
+
+    def test_structured_cab_falls_back_to_average_if_coordinator_is_unparseable(self):
+        backend = CaptureBackend(
+            [
+                '{"answer": 1, "analysis": "cognitive"}',
+                '{"answer": 2, "analysis": "affective"}',
+                '{"answer": 3, "analysis": "behavioral"}',
+                "I cannot decide.",
+            ]
+        )
+        actor = Actor({"age": 45}, backend=backend)
+
+        response = actor.turn("Question text?", mode="cab")
+
+        self.assertEqual(response.answer, 2)
+        self.assertIn("Fallback average_ceiling", response.analysis)
 
     def test_wvs_trait_vector_matches_original_nature_profile_lines(self):
         nature_options = {
